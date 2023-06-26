@@ -7,8 +7,15 @@ import { GUI } from 'dat.gui';
 // Geometry parameters
 const pineTreeParams = {
     branchingFactor: 4,
-    recursionDepth: 2.
+    recursionDepth: 2,
+    baseRadius: 1,
+    baseLength: 200,
+    branchAngle: 60 * Math.PI / 180,
+    scalingFactor: 2,
+    branchLengthPadding: 0.8,
 };
+pineTreeParams.geometry = new THREE.CylinderGeometry(pineTreeParams.baseRadius, pineTreeParams.baseRadius, pineTreeParams.baseLength, 32);
+pineTreeParams.material = new THREE.MeshStandardMaterial({ color: 0x00ff00, roughness: 0.5, metalness: 0.5 });
 
 // Size of the canvas
 const sizes = {
@@ -19,8 +26,8 @@ const sizes = {
 // Scene
 const scene = new THREE.Scene();
 
-// Geometry, Material, Mesh
-let baseMesh = new PineTree(pineTreeParams.branchingFactor, pineTreeParams.recursionDepth).generateMesh();
+// Mesh
+let baseMesh = new PineTree(pineTreeParams).generateMesh();
 scene.add(baseMesh);
 
 // GUI to control branching factor and recursion depth
@@ -30,18 +37,18 @@ const recursionDepthController = gui.add(pineTreeParams, 'recursionDepth', 1, 10
 branchingFactorController.onFinishChange((value) => {
     pineTreeParams.branchingFactor = value;
     scene.remove(baseMesh);
-    baseMesh = new PineTree(pineTreeParams.branchingFactor, pineTreeParams.recursionDepth).generateMesh();
+    baseMesh = new PineTree(pineTreeParams).generateMesh();
     scene.add(baseMesh);
 });
 recursionDepthController.onFinishChange((value) => {
     pineTreeParams.recursionDepth = value;
     scene.remove(baseMesh);
-    baseMesh = new PineTree(pineTreeParams.branchingFactor, pineTreeParams.recursionDepth).generateMesh();
+    baseMesh = new PineTree(pineTreeParams).generateMesh();
     scene.add(baseMesh);
 });
 
 // Light
-const light = new THREE.DirectionalLight(0xffffff, 0.5);
+const light = new THREE.DirectionalLight(0xffffff, 3);
 light.position.set(0, 1, 1);
 scene.add(light);
 
@@ -60,9 +67,6 @@ renderer.render(scene, camera);
 
 // Controls
 const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = true;
-controls.autoRotate = false;
-controls.autoRotateSpeed = 3.0;
 
 // Resize
 window.addEventListener('resize', () => {
@@ -78,15 +82,51 @@ window.addEventListener('resize', () => {
     renderer.setSize(sizes.width, sizes.height);
 });
 
+// Mouse position and click tracking
+const pointer = new THREE.Vector2();
+window.addEventListener('mousemove', (event) => {
+    pointer.x = (event.clientX / sizes.width) * 2 - 1;
+    pointer.y = -(event.clientY / sizes.height) * 2 + 1;
+});
+
+// Raycasting to intersect with meshes and add new branches
+const raycaster = new THREE.Raycaster();
+window.addEventListener('click', (event) => {
+    if(event.button === 0) {
+        // Raycasting
+        raycaster.setFromCamera(pointer, camera);
+        const intersects = raycaster.intersectObjects(scene.children);
+        if(intersects.length > 0)
+        {
+            const child = new THREE.Mesh(pineTreeParams.geometry, pineTreeParams.material);
+            const parent = intersects[0].object;
+            parent.add(child);
+            const localCoords = parent.worldToLocal(intersects[0].point);
+            child.position.set(localCoords.x, localCoords.y, localCoords.z);
+            child.scale.set(1 / pineTreeParams.scalingFactor, 1 / pineTreeParams.scalingFactor, 1 / pineTreeParams.scalingFactor);
+            const trueNormal = intersects[0].normal.clone().normalize();
+            const crossVec = new THREE.Vector3().crossVectors(trueNormal, parent.localToWorld(new THREE.Vector3(0, 1, 0))).normalize();
+            trueNormal.applyAxisAngle(crossVec, Math.PI / 2 - pineTreeParams.branchAngle);
+            child.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), trueNormal);
+            child.translateOnAxis(new THREE.Vector3(0, 1, 0), pineTreeParams.baseLength / pineTreeParams.scalingFactor / 2);
+        }
+    }
+});
+
 // Main animation loop
 const animate = () => {
-    window.requestAnimationFrame(animate);
+    // Rotate all branches
+    baseMesh.traverse((child) => {
+        child.applyMatrix4(new THREE.Matrix4().makeRotationY(1e-3));
+    });
 
     // Update controls
     controls.update();
 
     // Render
-    //scene.updateMatrixWorld();
     renderer.render(scene, camera);
-}
+
+    // Call animate again on the next frame
+    window.requestAnimationFrame(animate);
+};
 animate();

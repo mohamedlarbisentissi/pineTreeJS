@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 
 export default class PineTree {
-    constructor(branchingFactor, recursionDepth) {
-        this.baseRadius = 1;
-        this.baseLength = 200;
-        this.branchAngle = 60 * Math.PI / 180;
-        this.scalingFactor = 2;
-        this.branchLengthPadding = 0.8;
-        this.branchingFactor = branchingFactor;
-        this.recursionDepth = recursionDepth;
+    constructor(pineTreeParams) {
+        this.baseRadius = pineTreeParams.baseRadius;
+        this.baseLength = pineTreeParams.baseLength;
+        this.branchAngle = pineTreeParams.branchAngle;
+        this.scalingFactor = pineTreeParams.scalingFactor;
+        this.branchLengthPadding = pineTreeParams.branchLengthPadding;
+        this.branchingFactor = pineTreeParams.branchingFactor;
+        this.recursionDepth = pineTreeParams.recursionDepth;
         // Geometry, Material
-        this.geometry = new THREE.CylinderGeometry(this.baseRadius, this.baseRadius, this.baseLength, 32);
-        this.material = new THREE.MeshStandardMaterial({ color: 0x00ff00, roughness: 0.5, metalness: 0.5 });
+        this.geometry = pineTreeParams.geometry;
+        this.material = pineTreeParams.material;
     }
 
     generateMesh() {
@@ -28,7 +28,7 @@ export default class PineTree {
             return;
         }
         for(let i = 0; i < this.branchingFactor; i++) {
-            let child = new THREE.Mesh(this.geometry, this.material);
+            const child = new THREE.Mesh(this.geometry, this.material);
             parentMesh.add(child);
             child.scale.set(1 / this.scalingFactor, 1 / this.scalingFactor, 1 / this.scalingFactor);
             child.applyMatrix4(new THREE.Matrix4().makeRotationZ(this.branchAngle));
